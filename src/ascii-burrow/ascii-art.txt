@@ -1,7 +1,4 @@
-import { intro, outro, text, spinner, isCancel, cancel } from "@clack/prompts";
-
-const asciiArt = `
-                                                                                                                                                                        
+                                                                                               
                                             :--:.         .:..                                      
                                            .=#**#+.      .:###-.                                    
                                           .+*++++**+*##########-.                                   
@@ -44,97 +41,11 @@ const asciiArt = `
               .=##.    .*#*:*##:    +##-.##+.  .##=. .-##=.   .+##- :*#-#+. .#*+#+                  
               .=#########*:..*#########-.##+.  .##=.  .:*#######*:  .=###-   =###:                  
               .:-------:.     .-==-..--..--:.  .--:.    ..-==-:..    .--:.   .--:.                  
-`;
-
-intro(asciiArt);
-
-const awsAccessKey = await text({
-  message: "Enter AWS Access Key ID:",
-  validate(value) {
-    if (value.length === 0) return `Value is required!`;
-  },
-});
-
-if (isCancel(awsAccessKey)) {
-  cancel("Operation cancelled.");
-  process.exit(0);
-}
-
-const awsAccessSecret = await text({
-  message: "Enter AWS Secret Access Key:",
-  validate(value) {
-    if (value.length === 0) return `Value is required!`;
-  },
-});
-
-if (isCancel(awsAccessSecret)) {
-  cancel("Operation cancelled.");
-  process.exit(0);
-}
-
-const awsVPCId = await text({
-  message: "Enter VPC ID:",
-  validate(value) {
-    if (value.length === 0) return `Value is required!`;
-  },
-});
-
-if (isCancel(awsVPCId)) {
-  cancel("Operation cancelled.");
-  process.exit(0);
-}
-
-const publicSubnet1 = await text({
-  message: "Enter Public Subnet ID #1:",
-  validate(value) {
-    if (value.length === 0) return `Value is required!`;
-  },
-});
-
-if (isCancel(publicSubnet1)) {
-  cancel("Operation cancelled.");
-  process.exit(0);
-}
-
-const publicSubnet2 = await text({
-  message: "Enter Public Subnet ID #2:",
-  validate(value) {
-    if (value.length === 0) return `Value is required!`;
-  },
-});
-
-if (isCancel(publicSubnet2)) {
-  cancel("Operation cancelled.");
-  process.exit(0);
-}
-
-const privateSubnet1 = await text({
-  message: "Enter Private Subnet ID #1:",
-  validate(value) {
-    if (value.length === 0) return `Value is required!`;
-  },
-});
-
-if (isCancel(privateSubnet1)) {
-  cancel("Operation cancelled.");
-  process.exit(0);
-}
-
-const privateSubnet2 = await text({
-  message: "Enter Private Subnet ID #2:",
-  validate(value) {
-    if (value.length === 0) return `Value is required!`;
-  },
-});
-
-if (isCancel(privateSubnet2)) {
-  cancel("Operation cancelled.");
-  process.exit(0);
-}
-
-const s = spinner();
-s.start("Building AWS infra");
-await new Promise((resolve) => setTimeout(resolve, 3000));
-s.stop("Done building.");
-
-outro(`You're all set!`);
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
