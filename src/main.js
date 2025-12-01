@@ -52,7 +52,7 @@ const asciiArt = `
               .:-------:.     .-==-..--..--:.  .--:.    ..-==-:..    .--:.   .--:.                  
 `;
 
-const burrowInfraDir = await findUp("burrow-infrastructure/terraform-test", {
+const burrowInfraDir = await findUp("burrow-infrastructure/terraform", {
   type: "directory",
 });
 
@@ -72,56 +72,55 @@ async function verifyingAWSUser() {
 
 // // verifyingAWSUser();
 
-// intro(asciiArt);
+async function createTerraformStateBucket(region, bucketName) {
+  const s = spinner();
+  s.start("Creating Terraform state bucket");
 
-// Get region from user
-const region = await text({
-  message: "Enter AWS region:",
-  validate(value) {
-    if (!value) return "Region is required!";
-    // Optional: validate region format
-    if (!/^[a-z0-9-]+$/i.test(value)) return "Invalid region format";
-  },
-});
+  try {
+    const normalizedRegion = region.toLowerCase();
+    const s3 = new AWS.S3({ region: normalizedRegion });
 
-// Normalize region to lowercase
-const normalizedRegion = region.toLowerCase();
-
-// // Generate unique bucket name
-const uuid = randomUUID().split("-")[0]; // First 8 chars for shorter name
-const bucketName = `burrow-terraform-state-${normalizedRegion}-${uuid}`;
-const s3 = new AWS.S3({ region: normalizedRegion });
-
-const s = spinner();
-s.start("Creating Terraform state bucket");
-
-try {
-  // Create bucket
-  // Note: LocationConstraint not needed for us-east-1
-  const createBucketParams = {
-    Bucket: bucketName,
-  };
-
-  if (normalizedRegion !== "us-east-1") {
-    createBucketParams.CreateBucketConfiguration = {
-      LocationConstraint: normalizedRegion,
+    // Create bucket
+    // Note: LocationConstraint not needed for us-east-1
+    const createBucketParams = {
+      Bucket: bucketName,
     };
+
+    if (normalizedRegion !== "us-east-1") {
+      createBucketParams.CreateBucketConfiguration = {
+        LocationConstraint: normalizedRegion,
+      };
+    }
+
+    await s3.createBucket(createBucketParams).promise();
+
+    console.log(`✅ Created Terraform state bucket: ${bucketName}`);
+    s.stop(`Created state bucket: ${bucketName}`);
+    return bucketName;
+  } catch (error) {
+    s.stop("Failed to create bucket");
+    console.error(`❌ Failed to create bucket: ${error.message}`);
+    throw error;
   }
-
-  await s3.createBucket(createBucketParams).promise();
-
-  console.log(`✅ Created Terraform state bucket: ${bucketName}`);
-} catch (error) {
-  console.error(`❌ Failed to create bucket: ${error.message}`);
 }
-s.stop(`Created state bucket: ${bucketName}`);
 
-async function runTerraformInit(terraformDir) {
+async function runTerraformInit(terraformDir, bucketName, region) {
   const s = spinner();
   s.start("Initializing Terraform");
 
   try {
-    await execa("terraform", ["init"], { cwd: terraformDir });
+    await execa(
+      "terraform",
+      [
+        "init",
+        "-reconfigure",
+        `-backend-config=bucket=${bucketName}`,
+        "-backend-config=key=burrow/terraform-test.tfstate",
+        `-backend-config=region=${region}`,
+        "-backend-config=encrypt=true",
+      ],
+      { cwd: terraformDir }
+    );
     s.stop("Terraform initialized successfully");
   } catch (error) {
     s.stop("Failed to initialize Terraform");
@@ -130,7 +129,15 @@ async function runTerraformInit(terraformDir) {
   }
 }
 
-async function runTerraApply(terraformDir, bucketName) {
+async function runTerraApply(
+  terraformDir,
+  awsVPCId,
+  publicSubnet1,
+  publicSubnet2,
+  privateSubnet1,
+  privateSubnet2,
+  region
+) {
   const s = spinner();
   s.start("Applying Terraform");
 
@@ -140,8 +147,12 @@ async function runTerraApply(terraformDir, bucketName) {
       [
         "apply",
         "-auto-approve",
-        `-var`,
-        `state_bucket=${"hello-cli-world-1234"}`,
+        `-var=vpc_id=${awsVPCId}`,
+        `-var=public_subnet_1_id=${publicSubnet1}`,
+        `-var=public_subnet_2_id=${publicSubnet2}`,
+        `-var=private_subnet_1_id=${privateSubnet1}`,
+        `-var=private_subnet_2_id=${privateSubnet2}`,
+        `-var=region=${region}`,
       ],
       {
         cwd: terraformDir,
@@ -156,94 +167,145 @@ async function runTerraApply(terraformDir, bucketName) {
   }
 }
 
-await runTerraformInit(burrowInfraDir);
-await runTerraApply(burrowInfraDir);
+async function getTerraformOutput(terraformDir) {
+  const s = spinner();
+  s.start("Getting Terraform outputs");
 
-// Bucket creation code here
+  try {
+    // Fetch all 3 outputs in parallel
+    const [adminPassword, ingestionToken, queryToken] = await Promise.all([
+      execa("terraform", ["output", "-raw", "admin-password"], {
+        cwd: terraformDir,
+      }),
+      // execa("terraform", ["output", "-raw", "ingestion-api-token"], {
+      //   cwd: terraformDir,
+      // }),
+      execa("terraform", ["output", "-raw", "query-api-token"], {
+        cwd: terraformDir,
+      }),
+    ]);
 
-// Pass bucketName to Terraform as backend configuration
+    s.stop("Got all Terraform outputs");
+    console.log("");
 
-// const awsVPCId = await text({
-//   message: "Enter VPC ID:",
-//   validate(value) {
-//     if (value.length === 0) return `Value is required!`;
-//   },
-// });
+    // Display admin password
+    console.log(`✅ UI Login Credentials:`);
+    console.log(`   username: admin`);
+    console.log(`   password: ${adminPassword.stdout.trim()}`);
+    console.log("");
 
-// if (isCancel(awsVPCId)) {
-//   cancel("Operation cancelled.");
-//   process.exit(0);
-// }
+    // Display ingestion API token
+    // console.log(`✅ Ingestion API Token: ${ingestionToken.stdout.trim()}`);
+    // console.log(
+    //   `   Used for: Authenticating requests to the ingestion API for sending data into Burrow`
+    // );
+    // console.log("");
 
-// const publicSubnet1 = await text({
-//   message: "Enter Public Subnet ID #1:",
-//   validate(value) {
-//     if (value.length === 0) return `Value is required!`;
-//   },
-// });
+    // Display query API token
+    console.log(`✅ Query API Token: ${queryToken.stdout.trim()}`);
+    console.log(
+      `   Used for: Authenticating requests to the query API for retrieving and searching data from Burrow`
+    );
+  } catch (error) {
+    s.stop("Failed to get Terraform outputs");
+    console.error("Error:", error.message);
+    throw error;
+  }
+}
 
-// if (isCancel(publicSubnet1)) {
-//   cancel("Operation cancelled.");
-//   process.exit(0);
-// }
+intro(asciiArt);
 
-// const publicSubnet2 = await text({
-//   message: "Enter Public Subnet ID #2:",
-//   validate(value) {
-//     if (value.length === 0) return `Value is required!`;
-//   },
-// });
+// Get region from user
+const region = await text({
+  message: "Enter AWS region:",
+  validate(value) {
+    if (!value) return "Region is required!";
+    // Optional: validate region format
+    if (!/^[a-z0-9-]+$/i.test(value)) return "Invalid region format";
+  },
+});
 
-// if (isCancel(publicSubnet2)) {
-//   cancel("Operation cancelled.");
-//   process.exit(0);
-// }
+if (isCancel(region)) {
+  cancel("Operation cancelled.");
+  process.exit(0);
+}
 
-// const privateSubnet1 = await text({
-//   message: "Enter Private Subnet ID #1:",
-//   validate(value) {
-//     if (value.length === 0) return `Value is required!`;
-//   },
-// });
+// Generate unique bucket name
+const uuid = randomUUID().split("-")[0]; // First 8 chars for shorter name
+const bucketName = `burrow-terraform-state-${region.toLowerCase()}-${uuid}`;
 
-// if (isCancel(privateSubnet1)) {
-//   cancel("Operation cancelled.");
-//   process.exit(0);
-// }
+const awsVPCId = await text({
+  message: "Enter VPC ID:",
+  validate(value) {
+    if (value.length === 0) return `Value is required!`;
+  },
+});
 
-// const privateSubnet2 = await text({
-//   message: "Enter Private Subnet ID #2:",
-//   validate(value) {
-//     if (value.length === 0) return `Value is required!`;
-//   },
-// });
+if (isCancel(awsVPCId)) {
+  cancel("Operation cancelled.");
+  process.exit(0);
+}
 
-// if (isCancel(privateSubnet2)) {
-//   cancel("Operation cancelled.");
-//   process.exit(0);
-// }
+const publicSubnet1 = await text({
+  message: "Enter Public Subnet ID #1:",
+  validate(value) {
+    if (value.length === 0) return `Value is required!`;
+  },
+});
 
-// exec(`npm run test`, (error, stdout, stderr) => {
-//   if (error) {
-//     console.error(`exec error: ${error}`);
-//     return;
-//   }
-//   if (stderr) {
-//     console.error(`stderr: ${stderr}`);
-//     // A command might write errors to stderr but still not return an 'error' object
-//   }
-//   console.log(`stdout: ${stdout}`);
-// });
+if (isCancel(publicSubnet1)) {
+  cancel("Operation cancelled.");
+  process.exit(0);
+}
 
-// const s = spinner();
-// s.start("Building AWS infra");
+const publicSubnet2 = await text({
+  message: "Enter Public Subnet ID #2:",
+  validate(value) {
+    if (value.length === 0) return `Value is required!`;
+  },
+});
 
-// await new Promise((resolve) => setTimeout(resolve, 3000));
-// log them in
-// make s3 state bucket (Terraform backend)
-// uuid funciton to generate id append to burrow-state
+if (isCancel(publicSubnet2)) {
+  cancel("Operation cancelled.");
+  process.exit(0);
+}
 
-// terraform apply supply arguments vpc, subnet ids, region, state bucket name
-// s.stop("Done building.");
+const privateSubnet1 = await text({
+  message: "Enter Private Subnet ID #1:",
+  validate(value) {
+    if (value.length === 0) return `Value is required!`;
+  },
+});
+
+if (isCancel(privateSubnet1)) {
+  cancel("Operation cancelled.");
+  process.exit(0);
+}
+
+const privateSubnet2 = await text({
+  message: "Enter Private Subnet ID #2:",
+  validate(value) {
+    if (value.length === 0) return `Value is required!`;
+  },
+});
+
+if (isCancel(privateSubnet2)) {
+  cancel("Operation cancelled.");
+  process.exit(0);
+}
+
+await createTerraformStateBucket(region, bucketName);
+await runTerraformInit(burrowInfraDir, bucketName, region);
+await runTerraApply(
+  burrowInfraDir,
+  awsVPCId,
+  publicSubnet1,
+  publicSubnet2,
+  privateSubnet1,
+  privateSubnet2,
+  region
+);
+
+await getTerraformOutput(burrowInfraDir);
 
 outro(`You're all set!`);
