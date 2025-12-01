@@ -1,4 +1,12 @@
-import { intro, outro, text, spinner, isCancel, cancel } from "@clack/prompts";
+import {
+  intro,
+  outro,
+  text,
+  spinner,
+  isCancel,
+  cancel,
+  note,
+} from "@clack/prompts";
 import { execa } from "execa";
 import { randomUUID } from "crypto";
 import AWS from "aws-sdk";
@@ -114,7 +122,7 @@ async function runTerraformInit(terraformDir, bucketName, region) {
         "init",
         "-reconfigure",
         `-backend-config=bucket=${bucketName}`,
-        "-backend-config=key=burrow.tfstate",
+        "-backend-config=key=burrow/terraform-main.tfstate",
         `-backend-config=region=${region}`,
         "-backend-config=encrypt=true",
       ],
@@ -172,28 +180,57 @@ async function getTerraformOutput(terraformDir) {
 
   try {
     // Fetch all 2 outputs in parallel
-    const [adminPassword, queryToken] = await Promise.all([
+    const [adminPassword, queryToken, cloudfrontDnsRecord] = await Promise.all([
       execa("terraform", ["output", "-raw", "admin-password"], {
         cwd: terraformDir,
       }),
       execa("terraform", ["output", "-raw", "query-api-token"], {
         cwd: terraformDir,
       }),
+      execa("terraform", ["output", "-raw", "cloudfront-dns-record"], {
+        cwd: terraformDir,
+      }),
     ]);
 
-    s.stop("Got all Terraform outputs");
-    console.log("");
+    s.stop("Deployed! Here's all the information you'll need:");
 
-    // Display admin password
-    console.log(`✅ UI Login Credentials:`);
-    console.log(`   username: admin`);
-    console.log(`   password: ${adminPassword.stdout.trim()}`);
-    console.log("");
+    const formatContent = (content, minLines = 2, width = 60) => {
+      const lines = content.split("\n");
+      // Pad each line to the same width
+      const paddedLines = lines.map((line) => line.padEnd(width));
+      // Ensure minimum number of lines
+      while (paddedLines.length < minLines) {
+        paddedLines.push("".padEnd(width));
+      }
+      return paddedLines.join("\n");
+    };
 
-    // Display query API token
-    console.log(`✅ Query API Token: ${queryToken.stdout.trim()}`);
-    console.log(
-      `   Used for: Authenticating requests to the query API for retrieving and searching data from Burrow`
+    note(
+      formatContent(
+        `URL: ${cloudfrontDnsRecord.stdout.trim()}\nUsed for: Accessing the Burrow pipeline management UI`
+      ),
+      "🌐 Pipeline Management UI"
+    );
+
+    note(
+      formatContent(
+        `Username: admin\nPassword: ${adminPassword.stdout.trim()}`
+      ),
+      "🔒 UI Login Credentials"
+    );
+
+    note(
+      formatContent(
+        `Token: [Generated after deployment]\nUsed for: Authenticating requests to the management API`
+      ),
+      "🔑 Management API Token"
+    );
+
+    note(
+      formatContent(
+        `Token: ${queryToken.stdout.trim()}\nUsed for: Authenticating requests to the query API`
+      ),
+      "🔑 Query API Token"
     );
   } catch (error) {
     s.stop("Failed to get Terraform outputs");
