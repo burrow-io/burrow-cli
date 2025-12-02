@@ -64,22 +64,6 @@ const burrowInfraDir = await findUp("burrow-infrastructure/terraform", {
   type: "directory",
 });
 
-// if (!burrowInfraDir) {
-//   console.error("Error: burrow-infrastructure/terraform directory not found");
-//   process.exit(1);
-// }
-
-async function verifyingAWSUser() {
-  try {
-    const { stdout } = await execa("aws", ["sts", "get-caller-identity"]);
-    console.log(stdout);
-  } catch (error) {
-    console.error("Error:", error.message);
-  }
-}
-
-// // verifyingAWSUser();
-
 async function createTerraformStateBucket(region, bucketName) {
   const s = spinner();
   s.start("Creating Terraform state bucket");
@@ -88,8 +72,6 @@ async function createTerraformStateBucket(region, bucketName) {
     const normalizedRegion = region.toLowerCase();
     const s3 = new AWS.S3({ region: normalizedRegion });
 
-    // Create bucket
-    // Note: LocationConstraint not needed for us-east-1
     const createBucketParams = {
       Bucket: bucketName,
     };
@@ -164,7 +146,7 @@ async function runTerraApply(
       ],
       {
         cwd: terraformDir,
-        stdio: "inherit", // Show terraform output
+        stdio: "inherit",
       }
     );
     s.stop("Terraform applied successfully");
@@ -180,7 +162,6 @@ async function getTerraformOutput(terraformDir) {
   s.start("Getting Terraform outputs");
 
   try {
-    // Fetch all 2 outputs in parallel
     const [adminPassword, queryToken, cloudfrontDnsRecord] = await Promise.all([
       execa("terraform", ["output", "-raw", "admin-password"], {
         cwd: terraformDir,
@@ -213,13 +194,6 @@ async function getTerraformOutput(terraformDir) {
       "🌐🔒 Pipeline Management UI"
     );
 
-    // note(
-    //   formatContent(
-    //     `Username: admin\nPassword: ${adminPassword.stdout.trim()}`
-    //   ),
-    //   "🔒 UI Login Credentials"
-    // );
-
     note(
       formatContent(
         `Token:    [Generated after deployment]\nUsed for: Authenticating requests to the management API`
@@ -242,188 +216,184 @@ async function getTerraformOutput(terraformDir) {
 
 intro(other);
 
-// Get region from user
-// const region = await text({
-//   message: "Enter AWS region:",
-//   validate(value) {
-//     if (!value) return "Region is required!";
-//     // Optional: validate region format
-//     if (!/^[a-z0-9-]+$/i.test(value)) return "Invalid region format";
-//   },
-// });
+const region = await text({
+  message: "Enter AWS region:",
+  validate(value) {
+    if (!value) return "Region is required!";
+    if (!/^[a-z0-9-]+$/i.test(value)) return "Invalid region format";
+  },
+});
 
-// if (isCancel(region)) {
-//   cancel("Operation cancelled.");
-//   process.exit(0);
-// }
+if (isCancel(region)) {
+  cancel("Operation cancelled.");
+  process.exit(0);
+}
 
-// // Generate unique bucket name
-// const uuid = randomUUID().split("-")[0]; // First 8 chars for shorter name
-// const bucketName = `burrow-terraform-state-${region.toLowerCase()}-${uuid}`;
+const uuid = randomUUID().split("-")[0];
+const bucketName = `burrow-terraform-state-${region.toLowerCase()}-${uuid}`;
 
-// const awsVPCId = await text({
-//   message: "Enter VPC ID:",
-//   validate(value) {
-//     if (value.length === 0) return `Value is required!`;
-//   },
-// });
+const awsVPCId = await text({
+  message: "Enter VPC ID:",
+  validate(value) {
+    if (value.length === 0) return `Value is required!`;
+  },
+});
 
-// if (isCancel(awsVPCId)) {
-//   cancel("Operation cancelled.");
-//   process.exit(0);
-// }
+if (isCancel(awsVPCId)) {
+  cancel("Operation cancelled.");
+  process.exit(0);
+}
 
-// const publicSubnet1 = await text({
-//   message: "Enter Public Subnet ID #1:",
-//   validate(value) {
-//     if (value.length === 0) return `Value is required!`;
-//   },
-// });
+const publicSubnet1 = await text({
+  message: "Enter Public Subnet ID #1:",
+  validate(value) {
+    if (value.length === 0) return `Value is required!`;
+  },
+});
 
-// if (isCancel(publicSubnet1)) {
-//   cancel("Operation cancelled.");
-//   process.exit(0);
-// }
+if (isCancel(publicSubnet1)) {
+  cancel("Operation cancelled.");
+  process.exit(0);
+}
 
-// const publicSubnet2 = await text({
-//   message: "Enter Public Subnet ID #2:",
-//   validate(value) {
-//     if (value.length === 0) return `Value is required!`;
-//   },
-// });
+const publicSubnet2 = await text({
+  message: "Enter Public Subnet ID #2:",
+  validate(value) {
+    if (value.length === 0) return `Value is required!`;
+  },
+});
 
-// if (isCancel(publicSubnet2)) {
-//   cancel("Operation cancelled.");
-//   process.exit(0);
-// }
+if (isCancel(publicSubnet2)) {
+  cancel("Operation cancelled.");
+  process.exit(0);
+}
 
-// const privateSubnet1 = await text({
-//   message: "Enter Private Subnet ID #1:",
-//   validate(value) {
-//     if (value.length === 0) return `Value is required!`;
-//   },
-// });
+const privateSubnet1 = await text({
+  message: "Enter Private Subnet ID #1:",
+  validate(value) {
+    if (value.length === 0) return `Value is required!`;
+  },
+});
 
-// if (isCancel(privateSubnet1)) {
-//   cancel("Operation cancelled.");
-//   process.exit(0);
-// }
+if (isCancel(privateSubnet1)) {
+  cancel("Operation cancelled.");
+  process.exit(0);
+}
 
-// const privateSubnet2 = await text({
-//   message: "Enter Private Subnet ID #2:",
-//   validate(value) {
-//     if (value.length === 0) return `Value is required!`;
-//   },
-// });
+const privateSubnet2 = await text({
+  message: "Enter Private Subnet ID #2:",
+  validate(value) {
+    if (value.length === 0) return `Value is required!`;
+  },
+});
 
-// if (isCancel(privateSubnet2)) {
-//   cancel("Operation cancelled.");
-//   process.exit(0);
-// }
+if (isCancel(privateSubnet2)) {
+  cancel("Operation cancelled.");
+  process.exit(0);
+}
 
-// // await createTerraformStateBucket(region, bucketName);
-// await runTerraformInit(burrowInfraDir, bucketName, region);
-// await runTerraApply(
-//   burrowInfraDir,
-//   awsVPCId,
-//   publicSubnet1,
-//   publicSubnet2,
-//   privateSubnet1,
-//   privateSubnet2,
-//   region
-// );
+await runTerraformInit(burrowInfraDir, bucketName, region);
+await runTerraApply(
+  burrowInfraDir,
+  awsVPCId,
+  publicSubnet1,
+  publicSubnet2,
+  privateSubnet1,
+  privateSubnet2,
+  region
+);
 
-// const frontendDir = await findUp("burrow-frontend", {
-//   type: "directory",
-// });
+const frontendDir = await findUp("burrow-frontend", {
+  type: "directory",
+});
 
-// async function buildFrontend(frontendDir) {
-//   const s = spinner();
-//   s.start("Building UI");
+async function buildFrontend(frontendDir) {
+  const s = spinner();
+  s.start("Building UI");
 
-//   try {
-//     await execa("npm", ["run", "build"], { cwd: frontendDir });
-//     s.stop("Terraform initialized successfully");
-//   } catch (error) {
-//     s.stop("Failed to build the frontend");
-//     console.error("Error:", error.message);
-//     throw error;
-//   }
-// }
+  try {
+    await execa("npm", ["run", "build"], { cwd: frontendDir });
+    s.stop("Terraform initialized successfully");
+  } catch (error) {
+    s.stop("Failed to build the frontend");
+    console.error("Error:", error.message);
+    throw error;
+  }
+}
 
 await getTerraformOutput(burrowInfraDir);
-// await buildFrontend(frontendDir);
-// const distDir = await findUp("burrow-frontend/dist", {
-//   type: "directory",
-// });
+await buildFrontend(frontendDir);
+const distDir = await findUp("burrow-frontend/dist", {
+  type: "directory",
+});
 
-// let frontEndBucket = await execa(
-//   "terraform",
-//   ["output", "-raw", "front-end-bucket"],
-//   {
-//     cwd: burrowInfraDir,
-//   }
-// );
+let frontEndBucket = await execa(
+  "terraform",
+  ["output", "-raw", "front-end-bucket"],
+  {
+    cwd: burrowInfraDir,
+  }
+);
 
-// frontEndBucket = frontEndBucket.stdout.trim();
+frontEndBucket = frontEndBucket.stdout.trim();
 
-// async function getAllFiles(dirPath, baseDir = dirPath) {
-//   const files = [];
-//   const entries = await readdir(dirPath);
+async function getAllFiles(dirPath, baseDir = dirPath) {
+  const files = [];
+  const entries = await readdir(dirPath);
 
-//   for (const entry of entries) {
-//     const fullPath = path.join(dirPath, entry);
-//     const stats = await stat(fullPath);
+  for (const entry of entries) {
+    const fullPath = path.join(dirPath, entry);
+    const stats = await stat(fullPath);
 
-//     if (stats.isDirectory()) {
-//       files.push(...(await getAllFiles(fullPath, baseDir)));
-//     } else {
-//       const relativePath = path.relative(baseDir, fullPath);
-//       files.push({
-//         filePath: fullPath,
-//         key: relativePath.replace(/\\/g, "/"), // Ensure forward slashes for S3 keys
-//       });
-//     }
-//   }
+    if (stats.isDirectory()) {
+      files.push(...(await getAllFiles(fullPath, baseDir)));
+    } else {
+      const relativePath = path.relative(baseDir, fullPath);
+      files.push({
+        filePath: fullPath,
+        key: relativePath.replace(/\\/g, "/"), // Ensure forward slashes for S3 keys
+      });
+    }
+  }
 
-//   return files;
-// }
+  return files;
+}
 
-// const uploadFile = async (s3, bucket, filePath, key) => {
-//   const fileContent = await readFile(filePath);
+const uploadFile = async (s3, bucket, filePath, key) => {
+  const fileContent = await readFile(filePath);
 
-//   try {
-//     const response = await s3
-//       .putObject({
-//         Bucket: bucket,
-//         Key: key,
-//         Body: fileContent,
-//       })
-//       .promise();
+  try {
+    const response = await s3
+      .putObject({
+        Bucket: bucket,
+        Key: key,
+        Body: fileContent,
+      })
+      .promise();
 
-//     console.log(`Uploaded: ${key}`);
-//     return response;
-//   } catch (error) {
-//     console.error(`Error uploading ${key}:`, error.message);
-//     throw error;
-//   }
-// };
+    console.log(`Uploaded: ${key}`);
+    return response;
+  } catch (error) {
+    console.error(`Error uploading ${key}:`, error.message);
+    throw error;
+  }
+};
 
-// const uploadToS3 = async ({ frontEndBucket, distDir }) => {
-//   const s3 = new AWS.S3();
+const uploadToS3 = async ({ frontEndBucket, distDir }) => {
+  const s3 = new AWS.S3();
 
-//   try {
-//     const files = await getAllFiles(distDir);
+  try {
+    const files = await getAllFiles(distDir);
 
-//     for (const file of files) {
-//       await uploadFile(s3, frontEndBucket, file.filePath, file.key);
-//     }
-//   } catch (error) {
-//     console.error("Error during upload:", error);
-//     throw error;
-//   }
-// };
+    for (const file of files) {
+      await uploadFile(s3, frontEndBucket, file.filePath, file.key);
+    }
+  } catch (error) {
+    console.error("Error during upload:", error);
+    throw error;
+  }
+};
 
-// uploadToS3({ frontEndBucket, distDir });
+uploadToS3({ frontEndBucket, distDir });
 
 outro(`You're all set!`);
