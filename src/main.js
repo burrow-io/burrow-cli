@@ -10,6 +10,7 @@ import {
 import { execa } from "execa";
 import { randomUUID } from "crypto";
 import AWS from "aws-sdk";
+import { readFile, readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 // import { pathExists } from "path-exists";
@@ -63,22 +64,6 @@ const burrowInfraDir = await findUp("burrow-infrastructure/terraform", {
   type: "directory",
 });
 
-// if (!burrowInfraDir) {
-//   console.error("Error: burrow-infrastructure/terraform directory not found");
-//   process.exit(1);
-// }
-
-async function verifyingAWSUser() {
-  try {
-    const { stdout } = await execa("aws", ["sts", "get-caller-identity"]);
-    console.log(stdout);
-  } catch (error) {
-    console.error("Error:", error.message);
-  }
-}
-
-// // verifyingAWSUser();
-
 async function createTerraformStateBucket(region, bucketName) {
   const s = spinner();
   s.start("Creating Terraform state bucket");
@@ -87,8 +72,6 @@ async function createTerraformStateBucket(region, bucketName) {
     const normalizedRegion = region.toLowerCase();
     const s3 = new AWS.S3({ region: normalizedRegion });
 
-    // Create bucket
-    // Note: LocationConstraint not needed for us-east-1
     const createBucketParams = {
       Bucket: bucketName,
     };
@@ -121,7 +104,7 @@ async function runTerraformInit(terraformDir, bucketName, region) {
       [
         "init",
         "-reconfigure",
-        `-backend-config=bucket=${bucketName}`,
+        `-backend-config=bucket=burrow-terraform-state-us-east-1-12345`,
         "-backend-config=key=burrow/terraform-main.tfstate",
         `-backend-config=region=${region}`,
         "-backend-config=encrypt=true",
@@ -163,7 +146,7 @@ async function runTerraApply(
       ],
       {
         cwd: terraformDir,
-        stdio: "inherit", // Show terraform output
+        stdio: "inherit",
       }
     );
     s.stop("Terraform applied successfully");
@@ -179,7 +162,6 @@ async function getTerraformOutput(terraformDir) {
   s.start("Getting Terraform outputs");
 
   try {
-    // Fetch all 2 outputs in parallel
     const [adminPassword, queryToken, cloudfrontDnsRecord] = await Promise.all([
       execa("terraform", ["output", "-raw", "admin-password"], {
         cwd: terraformDir,
@@ -207,28 +189,21 @@ async function getTerraformOutput(terraformDir) {
 
     note(
       formatContent(
-        `URL: ${cloudfrontDnsRecord.stdout.trim()}\nUsed for: Accessing the Burrow pipeline management UI`
+        `URL:      ${cloudfrontDnsRecord.stdout.trim()}\nUsername: admin\nPassword: ${adminPassword.stdout.trim()}\nUsed for: Accessing the Burrow pipeline management UI`
       ),
-      "🌐 Pipeline Management UI"
+      "🌐🔒 Pipeline Management UI"
     );
 
     note(
       formatContent(
-        `Username: admin\nPassword: ${adminPassword.stdout.trim()}`
-      ),
-      "🔒 UI Login Credentials"
-    );
-
-    note(
-      formatContent(
-        `Token: [Generated after deployment]\nUsed for: Authenticating requests to the management API`
+        `Token:    [Generated after deployment]\nUsed for: Authenticating requests to the management API`
       ),
       "🔑 Management API Token"
     );
 
     note(
       formatContent(
-        `Token: ${queryToken.stdout.trim()}\nUsed for: Authenticating requests to the query API`
+        `Token:    ${queryToken.stdout.trim()}\nUsed for: Authenticating requests to the query API`
       ),
       "🔑 Query API Token"
     );
@@ -241,12 +216,10 @@ async function getTerraformOutput(terraformDir) {
 
 intro(other);
 
-// Get region from user
 const region = await text({
   message: "Enter AWS region:",
   validate(value) {
     if (!value) return "Region is required!";
-    // Optional: validate region format
     if (!/^[a-z0-9-]+$/i.test(value)) return "Invalid region format";
   },
 });
@@ -256,8 +229,7 @@ if (isCancel(region)) {
   process.exit(0);
 }
 
-// Generate unique bucket name
-const uuid = randomUUID().split("-")[0]; // First 8 chars for shorter name
+const uuid = randomUUID().split("-")[0];
 const bucketName = `burrow-terraform-state-${region.toLowerCase()}-${uuid}`;
 
 const awsVPCId = await text({
@@ -320,7 +292,6 @@ if (isCancel(privateSubnet2)) {
   process.exit(0);
 }
 
-await createTerraformStateBucket(region, bucketName);
 await runTerraformInit(burrowInfraDir, bucketName, region);
 await runTerraApply(
   burrowInfraDir,
@@ -332,6 +303,97 @@ await runTerraApply(
   region
 );
 
+const frontendDir = await findUp("burrow-frontend", {
+  type: "directory",
+});
+
+async function buildFrontend(frontendDir) {
+  const s = spinner();
+  s.start("Building UI");
+
+  try {
+    await execa("npm", ["run", "build"], { cwd: frontendDir });
+    s.stop("Terraform initialized successfully");
+  } catch (error) {
+    s.stop("Failed to build the frontend");
+    console.error("Error:", error.message);
+    throw error;
+  }
+}
+
 await getTerraformOutput(burrowInfraDir);
+await buildFrontend(frontendDir);
+const distDir = await findUp("burrow-frontend/dist", {
+  type: "directory",
+});
+
+let frontEndBucket = await execa(
+  "terraform",
+  ["output", "-raw", "front-end-bucket"],
+  {
+    cwd: burrowInfraDir,
+  }
+);
+
+frontEndBucket = frontEndBucket.stdout.trim();
+
+async function getAllFiles(dirPath, baseDir = dirPath) {
+  const files = [];
+  const entries = await readdir(dirPath);
+
+  for (const entry of entries) {
+    const fullPath = path.join(dirPath, entry);
+    const stats = await stat(fullPath);
+
+    if (stats.isDirectory()) {
+      files.push(...(await getAllFiles(fullPath, baseDir)));
+    } else {
+      const relativePath = path.relative(baseDir, fullPath);
+      files.push({
+        filePath: fullPath,
+        key: relativePath.replace(/\\/g, "/"), // Ensure forward slashes for S3 keys
+      });
+    }
+  }
+
+  return files;
+}
+
+const uploadFile = async (s3, bucket, filePath, key) => {
+  const fileContent = await readFile(filePath);
+
+  try {
+    const response = await s3
+      .putObject({
+        Bucket: bucket,
+        Key: key,
+        Body: fileContent,
+      })
+      .promise();
+
+    console.log(`Uploaded: ${key}`);
+    return response;
+  } catch (error) {
+    console.error(`Error uploading ${key}:`, error.message);
+    throw error;
+  }
+};
+
+const uploadToS3 = async ({ frontEndBucket, distDir }) => {
+  const s3 = new AWS.S3();
+
+  try {
+    const files = await getAllFiles(distDir);
+
+    for (const file of files) {
+      await uploadFile(s3, frontEndBucket, file.filePath, file.key);
+    }
+  } catch (error) {
+    console.error("Error during upload:", error);
+    throw error;
+  }
+};
+
+uploadToS3({ frontEndBucket, distDir });
 
 outro(`You're all set!`);
