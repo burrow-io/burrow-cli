@@ -23,6 +23,18 @@ npm ci
 
 ## Usage
 
+### Deploy Infrastructure
+
 ```bash
 npm start
 ```
+
+Deploys AWS infrastructure using Terraform. Prompts for AWS region, VPC ID, and subnet IDs, then initializes Terraform, applies the configuration, and uploads the frontend build to S3.
+
+### Destroy Infrastructure
+
+```bashgit
+npm run destroy
+```
+
+Destroys all AWS infrastructure managed by Terraform. Runs `terraform destroy` to remove all resources. 

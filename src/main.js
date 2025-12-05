@@ -13,7 +13,6 @@ import AWS from "aws-sdk";
 import { readFile, readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-// import { pathExists } from "path-exists";
 import { findUp, findDown } from "find-up";
 
 const other = `
@@ -104,7 +103,7 @@ async function runTerraformInit(terraformDir, bucketName, region) {
       [
         "init",
         "-reconfigure",
-        `-backend-config=bucket=burrow-terraform-state-us-east-1-12345`,
+        `-backend-config=bucket=${bucketName}`,
         "-backend-config=key=burrow/terraform-main.tfstate",
         `-backend-config=region=${region}`,
         "-backend-config=encrypt=true",
@@ -292,6 +291,7 @@ if (isCancel(privateSubnet2)) {
   process.exit(0);
 }
 
+await createTerraformStateBucket(region, bucketName);
 await runTerraformInit(burrowInfraDir, bucketName, region);
 await runTerraApply(
   burrowInfraDir,
@@ -371,7 +371,7 @@ const uploadFile = async (s3, bucket, filePath, key) => {
       })
       .promise();
 
-    console.log(`Uploaded: ${key}`);
+    // console.log(`Uploaded: ${key}`);
     return response;
   } catch (error) {
     console.error(`Error uploading ${key}:`, error.message);
