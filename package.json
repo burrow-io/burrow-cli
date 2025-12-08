@@ -2,13 +2,20 @@
   "type": "module",
   "scripts": {
     "test": "echo 'hello'",
-    "deploy": "node src/commands/deploy.js",
-    "destroy": "node src/commands/destroy.js"
+    "deploy": "tsx src/commands/deploy.ts",
+    "destroy": "tsx src/commands/destroy.ts",
+    "build": "tsc",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@clack/prompts": "^0.11.0",
     "aws-sdk": "^2.1692.0",
     "execa": "^9.6.0",
     "find-up": "^8.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.25",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
   }
 }

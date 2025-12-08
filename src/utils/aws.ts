@@ -1,9 +1,19 @@
 import { spinner } from "@clack/prompts";
-import AWS from "aws-sdk";
+import AWS, { type S3 } from "aws-sdk";
 import { readFile } from "node:fs/promises";
-import { getAllFiles } from "./buildFrontend.js";
+import { getAllFiles, getContentType } from "./buildFrontend";
 
-export async function createTerraformStateBucket(region, bucketName) {
+interface CreateBucket {
+  Bucket: string;
+  CreateBucketConfiguration?: {
+    LocationConstraint: string;
+  };
+}
+
+export async function createTerraformStateBucket(
+  region: string,
+  bucketName: string
+): Promise<string> {
   const s = spinner();
   s.start("Creating Terraform state bucket");
 
@@ -11,7 +21,7 @@ export async function createTerraformStateBucket(region, bucketName) {
     const normalizedRegion = region.toLowerCase();
     const s3 = new AWS.S3({ region: normalizedRegion });
 
-    const createBucketParams = {
+    const createBucketParams: CreateBucket = {
       Bucket: bucketName,
     };
 
@@ -21,20 +31,29 @@ export async function createTerraformStateBucket(region, bucketName) {
       };
     }
 
-    await s3.createBucket(createBucketParams).promise();
+    await s3
+      .createBucket(createBucketParams as S3.CreateBucketRequest)
+      .promise();
 
     console.log(`✅ Created Terraform state bucket: ${bucketName}`);
     s.stop(`Created state bucket: ${bucketName}`);
     return bucketName;
   } catch (error) {
     s.stop("Failed to create bucket");
-    console.error(`❌ Failed to create bucket: ${error.message}`);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`❌ Failed to create bucket: ${errorMessage}`);
     throw error;
   }
 }
 
-async function uploadFile(s3, bucket, filePath, key) {
+const uploadFile = async (
+  s3: S3,
+  bucket: string,
+  filePath: string,
+  key: string
+) => {
   const fileContent = await readFile(filePath);
+  const contentType = getContentType(filePath);
 
   try {
     const response = await s3
@@ -42,17 +61,29 @@ async function uploadFile(s3, bucket, filePath, key) {
         Bucket: bucket,
         Key: key,
         Body: fileContent,
+        ContentType: contentType,
       })
       .promise();
 
     return response;
   } catch (error) {
-    console.error(`Error uploading ${key}:`, error.message);
+    console.error(
+      `Error uploading ${key}:`,
+      error instanceof Error ? error.message : String(error)
+    );
     throw error;
   }
-}
+};
 
-export async function uploadToS3({ frontEndBucket, distDir }) {
+export const uploadToS3 = async ({
+  frontEndBucket,
+  distDir,
+}: {
+  frontEndBucket: string;
+  distDir: string;
+}) => {
+  const s = spinner();
+  s.start("Uploading frontend to S3");
   const s3 = new AWS.S3();
 
   try {
@@ -61,8 +92,10 @@ export async function uploadToS3({ frontEndBucket, distDir }) {
     for (const file of files) {
       await uploadFile(s3, frontEndBucket, file.filePath, file.key);
     }
+    s.stop("Frontend uploaded successfully!");
   } catch (error) {
+    s.stop("Failed to upload frontend.");
     console.error("Error during upload:", error);
     throw error;
   }
-}
+};

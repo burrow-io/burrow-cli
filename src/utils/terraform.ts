@@ -1,7 +1,11 @@
 import { spinner, note } from "@clack/prompts";
 import { execa } from "execa";
 
-export async function runTerraformInit(terraformDir, bucketName, region) {
+export async function runTerraformInit(
+  terraformDir: string,
+  bucketName: string,
+  region: string
+): Promise<void> {
   const s = spinner();
   s.start("Initializing Terraform");
 
@@ -18,23 +22,24 @@ export async function runTerraformInit(terraformDir, bucketName, region) {
       ],
       { cwd: terraformDir }
     );
-    s.stop("Terraform initialized successfully");
+    s.stop("Terraform initialized successfully!");
   } catch (error) {
     s.stop("Failed to initialize Terraform");
-    console.error("Error:", error.message);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error("Error:", errorMessage);
     throw error;
   }
 }
 
 export async function runTerraApply(
-  terraformDir,
-  awsVPCId,
-  publicSubnet1,
-  publicSubnet2,
-  privateSubnet1,
-  privateSubnet2,
-  region
-) {
+  terraformDir: string,
+  awsVPCId: string,
+  publicSubnet1: string,
+  publicSubnet2: string,
+  privateSubnet1: string,
+  privateSubnet2: string,
+  region: string
+): Promise<void> {
   const s = spinner();
   s.start("Applying Terraform");
 
@@ -56,17 +61,18 @@ export async function runTerraApply(
         stdio: "inherit",
       }
     );
-    s.stop("Terraform applied successfully");
+    s.stop("Terraform applied successfully!");
   } catch (error) {
     s.stop("Failed to apply Terraform");
-    console.error("Error:", error.message);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error("Error:", errorMessage);
     throw error;
   }
 }
 
-export async function getTerraformOutput(terraformDir) {
+export async function getTerraformOutput(terraformDir: string): Promise<void> {
   const s = spinner();
-  s.start("Getting Terraform outputs");
+  s.start("Getting Terraform outputs.");
 
   try {
     const [adminPassword, queryToken, cloudfrontDnsRecord, pipelineToken] =
@@ -87,7 +93,11 @@ export async function getTerraformOutput(terraformDir) {
 
     s.stop("Deployed! Here's all the information you'll need:");
 
-    const formatContent = (content, minLines = 2, width = 60) => {
+    const formatContent = (
+      content: string,
+      minLines = 2,
+      width = 60
+    ): string => {
       const lines = content.split("\n");
       // Pad each line to the same width
       const paddedLines = lines.map((line) => line.padEnd(width));
@@ -120,14 +130,15 @@ export async function getTerraformOutput(terraformDir) {
     );
   } catch (error) {
     s.stop("Failed to get Terraform outputs");
-    console.error("Error:", error.message);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error("Error:", errorMessage);
     throw error;
   }
 }
 
-export async function runTerraformDestroy(terraformDir) {
+export async function runTerraformDestroy(terraformDir: string): Promise<void> {
   const s = spinner();
-  s.start("Destroying Terraform infrastructure");
+  s.start("Destroying Terraform infrastructure.");
 
   try {
     await execa("terraform", ["destroy", "-auto-approve"], {
@@ -137,21 +148,26 @@ export async function runTerraformDestroy(terraformDir) {
     s.stop("Terraform destroy completed successfully");
   } catch (error) {
     s.stop("Failed to destroy Terraform infrastructure");
-    console.error("Error:", error.message);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error("Error:", errorMessage);
     throw error;
   }
 }
 
-export async function getTerraformOutputValue(terraformDir, outputName) {
+export async function getTerraformOutputValue(
+  terraformDir: string,
+  outputName: string
+): Promise<string> {
   try {
     const result = await execa("terraform", ["output", "-raw", outputName], {
       cwd: terraformDir,
     });
     return result.stdout.trim();
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     console.error(
       `Error getting Terraform output ${outputName}:`,
-      error.message
+      errorMessage
     );
     throw error;
   }

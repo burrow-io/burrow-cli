@@ -9,12 +9,16 @@ import {
   getTerraformOutputValue,
 } from "../utils/terraform.js";
 import { buildFrontend } from "../utils/buildFrontend.js";
-import { burrowSquirrel } from "../assets/ascii.ts";
+import { burrowSquirrel } from "../assets/ascii.js";
 
-export async function deploy() {
-  const burrowInfraDir = await findUp("burrow-infrastructure/terraform", {
+export async function deploy(): Promise<void> {
+  const terraformDir = await findUp("burrow-infrastructure/terraform", {
     type: "directory",
   });
+
+  if (!terraformDir) {
+    throw new Error("Could not find burrow-infrastructure/terraform directory");
+  }
 
   intro(burrowSquirrel);
 
@@ -23,10 +27,11 @@ export async function deploy() {
     validate(value) {
       if (!value) return "Region is required!";
       if (!/^[a-z0-9-]+$/i.test(value)) return "Invalid region format";
+      return;
     },
   });
 
-  if (isCancel(region)) {
+  if (isCancel(region) || typeof region !== "string") {
     cancel("Operation cancelled.");
     process.exit(0);
   }
@@ -38,10 +43,11 @@ export async function deploy() {
     message: "Enter VPC ID:",
     validate(value) {
       if (value.length === 0) return `Value is required!`;
+      return;
     },
   });
 
-  if (isCancel(awsVPCId)) {
+  if (isCancel(awsVPCId) || typeof awsVPCId !== "string") {
     cancel("Operation cancelled.");
     process.exit(0);
   }
@@ -50,10 +56,11 @@ export async function deploy() {
     message: "Enter Public Subnet ID #1:",
     validate(value) {
       if (value.length === 0) return `Value is required!`;
+      return;
     },
   });
 
-  if (isCancel(publicSubnet1)) {
+  if (isCancel(publicSubnet1) || typeof publicSubnet1 !== "string") {
     cancel("Operation cancelled.");
     process.exit(0);
   }
@@ -62,10 +69,11 @@ export async function deploy() {
     message: "Enter Public Subnet ID #2:",
     validate(value) {
       if (value.length === 0) return `Value is required!`;
+      return;
     },
   });
 
-  if (isCancel(publicSubnet2)) {
+  if (isCancel(publicSubnet2) || typeof publicSubnet2 !== "string") {
     cancel("Operation cancelled.");
     process.exit(0);
   }
@@ -74,10 +82,11 @@ export async function deploy() {
     message: "Enter Private Subnet ID #1:",
     validate(value) {
       if (value.length === 0) return `Value is required!`;
+      return;
     },
   });
 
-  if (isCancel(privateSubnet1)) {
+  if (isCancel(privateSubnet1) || typeof privateSubnet1 !== "string") {
     cancel("Operation cancelled.");
     process.exit(0);
   }
@@ -86,18 +95,19 @@ export async function deploy() {
     message: "Enter Private Subnet ID #2:",
     validate(value) {
       if (value.length === 0) return `Value is required!`;
+      return;
     },
   });
 
-  if (isCancel(privateSubnet2)) {
+  if (isCancel(privateSubnet2) || typeof privateSubnet2 !== "string") {
     cancel("Operation cancelled.");
     process.exit(0);
   }
 
   await createTerraformStateBucket(region, bucketName);
-  await runTerraformInit(burrowInfraDir, bucketName, region);
+  await runTerraformInit(terraformDir, bucketName, region);
   await runTerraApply(
-    burrowInfraDir,
+    terraformDir,
     awsVPCId,
     publicSubnet1,
     publicSubnet2,
@@ -110,28 +120,37 @@ export async function deploy() {
     type: "directory",
   });
 
-  await getTerraformOutput(burrowInfraDir);
+  if (!frontendDir) {
+    throw new Error("Could not find burrow-frontend directory");
+  }
+
   await buildFrontend(frontendDir);
   const distDir = await findUp("burrow-frontend/dist", {
     type: "directory",
   });
 
+  if (!distDir) {
+    throw new Error("Could not find burrow-frontend/dist directory");
+  }
+
   const frontEndBucket = await getTerraformOutputValue(
-    burrowInfraDir,
+    terraformDir,
     "front-end-bucket"
   );
 
   await uploadToS3({ frontEndBucket, distDir });
+  await getTerraformOutput(terraformDir);
 
   outro(`You're all set!`);
 }
 
-async function main() {
+async function main(): Promise<void> {
   try {
     await deploy();
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     console.error("\n❌ Deployment failed!");
-    console.error(`Error: ${error.message || error}`);
+    console.error(`Error: ${errorMessage}`);
     process.exit(1);
   }
 }

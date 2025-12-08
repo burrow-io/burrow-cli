@@ -26,7 +26,7 @@ npm ci
 ### Deploy Infrastructure
 
 ```bash
-npm start
+npm run reploy
 ```
 
 Deploys AWS infrastructure using Terraform. Prompts for AWS region, VPC ID, and subnet IDs, then initializes Terraform, applies the configuration, and uploads the frontend build to S3.
@@ -37,4 +37,4 @@ Deploys AWS infrastructure using Terraform. Prompts for AWS region, VPC ID, and 
 npm run destroy
 ```
 
-Destroys all AWS infrastructure managed by Terraform. Runs `terraform destroy` to remove all resources. 
+Destroys all AWS infrastructure managed by Terraform. Runs `terraform destroy` to remove all resources.
