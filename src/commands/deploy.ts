@@ -15,9 +15,9 @@ import { cloneRepo } from "../utils/cloneRepos.js";
 
 export async function clone(): Promise<void> {
   const burrowInfrastructure =
-    "https://github.com/teamFiveCapstone/burrow-infrastructure.git";
+    "https://github.com/burrow-io/burrow-infrastructure.git";
   const burrowFrontend =
-    "https://github.com/teamFiveCapstone/burrow-frontend.git";
+    "https://github.com/burrow-io/burrow-frontend.git";
   const oneUpDir = path.dirname(process.cwd());
 
   await cloneRepo(burrowInfrastructure, oneUpDir);
