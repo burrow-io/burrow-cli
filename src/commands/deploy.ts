@@ -1,6 +1,7 @@
 import { intro, outro, text, isCancel, cancel } from "@clack/prompts";
 import { randomUUID } from "crypto";
 import { findUp } from "find-up";
+import path from "node:path";
 import { createTerraformStateBucket, uploadToS3 } from "../utils/aws.js";
 import {
   runTerraformInit,
@@ -10,6 +11,18 @@ import {
 } from "../utils/terraform.js";
 import { buildFrontend } from "../utils/buildFrontend.js";
 import { burrowSquirrel } from "../assets/ascii.js";
+import { cloneRepo } from "../utils/cloneRepos.js";
+
+export async function clone(): Promise<void> {
+  const burrowInfrastructure =
+    "https://github.com/teamFiveCapstone/burrow-infrastructure.git";
+  const burrowFrontend =
+    "https://github.com/teamFiveCapstone/burrow-frontend.git";
+  const oneUpDir = path.dirname(process.cwd());
+
+  await cloneRepo(burrowInfrastructure, oneUpDir);
+  await cloneRepo(burrowFrontend, oneUpDir);
+}
 
 export async function deploy(): Promise<void> {
   const terraformDir = await findUp("burrow-infrastructure/terraform", {
@@ -146,6 +159,7 @@ export async function deploy(): Promise<void> {
 
 async function main(): Promise<void> {
   try {
+    await clone();
     await deploy();
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
