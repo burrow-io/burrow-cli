@@ -13,6 +13,7 @@ export async function buildFrontend(frontendDir: string): Promise<void> {
   s.start("Building UI");
 
   try {
+    await execa("npm", ["ci"], { cwd: frontendDir });
     await execa("npm", ["run", "build"], { cwd: frontendDir });
     s.stop("Frontend built!");
   } catch (error) {
