@@ -12,7 +12,7 @@ To learn more about Burrow, visit our [website](https://burrow-io.github.io/).
 
 Burrow deploys the following key components in your AWS account:
 
-![Diagram](https://i.imgur.com/VqVR3yl.png)
+![Diagram](https://i.imgur.com/4INWuMB.png)
 
 **Core Components:**
 - **CloudFront**: Handles all HTTPS traffic and routes requests to S3 or the load balancer
