@@ -6,7 +6,7 @@
 
 This repository contains the automated deployment process for Burrow, an open-source RAG-as-a-service platform that provides teams with production-grade document processing and advanced retrieval capabilities.
 
-To learn more about Burrow, visit our [website](https://burrow-io.github.io/burrow-case-study/) and [case study](https://burrow-io.github.io/burrow-case-study/case-study).
+To learn more about Burrow, visit our [website](https://burrow-io.github.io/).
 
 ## Infrastructure Overview
 
