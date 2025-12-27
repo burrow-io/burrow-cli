@@ -125,15 +125,36 @@ export async function getTerraformOutput(terraformDir: string): Promise<void> {
   }
 }
 
-export async function runTerraformDestroy(terraformDir: string): Promise<void> {
+export async function runTerraformDestroy(
+  terraformDir: string,
+  awsVPCId: string,
+  publicSubnet1: string,
+  publicSubnet2: string,
+  privateSubnet1: string,
+  privateSubnet2: string,
+  region: string
+): Promise<void> {
   const s = spinner();
   s.start("Destroying Terraform infrastructure.");
 
   try {
-    await execa("terraform", ["destroy", "-auto-approve"], {
-      cwd: terraformDir,
-      stdio: "inherit",
-    });
+    await execa(
+      "terraform",
+      [
+        "destroy",
+        "-auto-approve",
+        `-var=vpc_id=${awsVPCId}`,
+        `-var=public_subnet_1_id=${publicSubnet1}`,
+        `-var=public_subnet_2_id=${publicSubnet2}`,
+        `-var=private_subnet_1_id=${privateSubnet1}`,
+        `-var=private_subnet_2_id=${privateSubnet2}`,
+        `-var=region=${region}`,
+      ],
+      {
+        cwd: terraformDir,
+        stdio: "inherit",
+      }
+    );
     s.stop("Terraform destroy completed successfully");
   } catch (error) {
     s.stop("Failed to destroy Terraform infrastructure");
