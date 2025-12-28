@@ -1,9 +1,16 @@
 import { intro, outro } from "@clack/prompts";
 import { findUp } from "find-up";
 import { runTerraformDestroy } from "../utils/terraform.js";
+import { loadConfig } from "../utils/config.js";
 
 export async function destroy(): Promise<void> {
   intro("Terraform Destroy Command Executed");
+
+  const config = await loadConfig();
+
+  if (!config) {
+    throw new Error("No configuration found. Please run deploy first.");
+  }
 
   const burrowInfraDir = await findUp("burrow-infrastructure/terraform", {
     type: "directory",
@@ -14,7 +21,15 @@ export async function destroy(): Promise<void> {
   }
 
   try {
-    await runTerraformDestroy(burrowInfraDir);
+    await runTerraformDestroy(
+      burrowInfraDir,
+      config.awsVPCId,
+      config.publicSubnet1,
+      config.publicSubnet2,
+      config.privateSubnet1,
+      config.privateSubnet2,
+      config.region
+    );
     outro("All infrastructure has been destroyed.");
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);

@@ -12,6 +12,7 @@ import {
 import { buildFrontend } from "../utils/buildFrontend.js";
 import { burrowSquirrel } from "../assets/ascii.js";
 import { cloneRepo } from "../utils/cloneRepos.js";
+import { saveConfig, loadConfig } from "../utils/config.js";
 
 export async function clone(): Promise<void> {
   const burrowInfrastructure =
@@ -35,98 +36,105 @@ export async function deploy(): Promise<void> {
 
   intro(burrowSquirrel);
 
-  const region = await text({
-    message: "Enter AWS region:",
-    validate(value) {
-      if (!value) return "Region is required!";
-      if (!/^[a-z0-9-]+$/i.test(value)) return "Invalid region format";
-      return;
-    },
-  });
+  let config = await loadConfig();
 
-  if (isCancel(region) || typeof region !== "string") {
-    cancel("Operation cancelled.");
-    process.exit(0);
+  if (!config) {
+    const region = await text({
+      message: "Enter AWS region:",
+      validate(value) {
+        if (!value) return "Region is required!";
+        if (!/^[a-z0-9-]+$/i.test(value)) return "Invalid region format";
+        return;
+      },
+    });
+
+    if (isCancel(region) || typeof region !== "string") {
+      cancel("Operation cancelled.");
+      process.exit(0);
+    }
+
+    const uuid = randomUUID().split("-")[0];
+    const bucketName = `burrow-terraform-state-${region.toLowerCase()}-${uuid}`;
+
+    const awsVPCId = await text({
+      message: "Enter VPC ID:",
+      validate(value) {
+        if (value.length === 0) return `Value is required!`;
+        return;
+      },
+    });
+
+    if (isCancel(awsVPCId) || typeof awsVPCId !== "string") {
+      cancel("Operation cancelled.");
+      process.exit(0);
+    }
+
+    const publicSubnet1 = await text({
+      message: "Enter Public Subnet ID #1:",
+      validate(value) {
+        if (value.length === 0) return `Value is required!`;
+        return;
+      },
+    });
+
+    if (isCancel(publicSubnet1) || typeof publicSubnet1 !== "string") {
+      cancel("Operation cancelled.");
+      process.exit(0);
+    }
+
+    const publicSubnet2 = await text({
+      message: "Enter Public Subnet ID #2:",
+      validate(value) {
+        if (value.length === 0) return `Value is required!`;
+        return;
+      },
+    });
+
+    if (isCancel(publicSubnet2) || typeof publicSubnet2 !== "string") {
+      cancel("Operation cancelled.");
+      process.exit(0);
+    }
+
+    const privateSubnet1 = await text({
+      message: "Enter Private Subnet ID #1:",
+      validate(value) {
+        if (value.length === 0) return `Value is required!`;
+        return;
+      },
+    });
+
+    if (isCancel(privateSubnet1) || typeof privateSubnet1 !== "string") {
+      cancel("Operation cancelled.");
+      process.exit(0);
+    }
+
+    const privateSubnet2 = await text({
+      message: "Enter Private Subnet ID #2:",
+      validate(value) {
+        if (value.length === 0) return `Value is required!`;
+        return;
+      },
+    });
+
+    if (isCancel(privateSubnet2) || typeof privateSubnet2 !== "string") {
+      cancel("Operation cancelled.");
+      process.exit(0);
+    }
+
+    config = { bucketName, region, awsVPCId, publicSubnet1, publicSubnet2, privateSubnet1, privateSubnet2 };
+    await saveConfig(config);
   }
 
-  const uuid = randomUUID().split("-")[0];
-  const bucketName = `burrow-terraform-state-${region.toLowerCase()}-${uuid}`;
-
-  const awsVPCId = await text({
-    message: "Enter VPC ID:",
-    validate(value) {
-      if (value.length === 0) return `Value is required!`;
-      return;
-    },
-  });
-
-  if (isCancel(awsVPCId) || typeof awsVPCId !== "string") {
-    cancel("Operation cancelled.");
-    process.exit(0);
-  }
-
-  const publicSubnet1 = await text({
-    message: "Enter Public Subnet ID #1:",
-    validate(value) {
-      if (value.length === 0) return `Value is required!`;
-      return;
-    },
-  });
-
-  if (isCancel(publicSubnet1) || typeof publicSubnet1 !== "string") {
-    cancel("Operation cancelled.");
-    process.exit(0);
-  }
-
-  const publicSubnet2 = await text({
-    message: "Enter Public Subnet ID #2:",
-    validate(value) {
-      if (value.length === 0) return `Value is required!`;
-      return;
-    },
-  });
-
-  if (isCancel(publicSubnet2) || typeof publicSubnet2 !== "string") {
-    cancel("Operation cancelled.");
-    process.exit(0);
-  }
-
-  const privateSubnet1 = await text({
-    message: "Enter Private Subnet ID #1:",
-    validate(value) {
-      if (value.length === 0) return `Value is required!`;
-      return;
-    },
-  });
-
-  if (isCancel(privateSubnet1) || typeof privateSubnet1 !== "string") {
-    cancel("Operation cancelled.");
-    process.exit(0);
-  }
-
-  const privateSubnet2 = await text({
-    message: "Enter Private Subnet ID #2:",
-    validate(value) {
-      if (value.length === 0) return `Value is required!`;
-      return;
-    },
-  });
-
-  if (isCancel(privateSubnet2) || typeof privateSubnet2 !== "string") {
-    cancel("Operation cancelled.");
-    process.exit(0);
-  }
-
-  await createTerraformStateBucket(region, bucketName);
-  await runTerraformInit(terraformDir, bucketName, region);
+  await createTerraformStateBucket(config.region, config.bucketName);
+  await runTerraformInit(terraformDir, config.bucketName, config.region);
   await runTerraApply(
     terraformDir,
-    awsVPCId,
-    publicSubnet1,
-    publicSubnet2,
-    privateSubnet1,
-    privateSubnet2,
-    region
+    config.awsVPCId,
+    config.publicSubnet1,
+    config.publicSubnet2,
+    config.privateSubnet1,
+    config.privateSubnet2,
+    config.region
   );
 
   const frontendDir = await findUp("burrow-frontend", {
@@ -169,4 +177,4 @@ async function main(): Promise<void> {
   }
 }
 
-main();
+main()

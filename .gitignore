@@ -1,2 +1,3 @@
 node_modules
 dist
+.burrow-config.json
